@@ -7,7 +7,7 @@ _log = logging.getLogger(__name__)
 
 
 def export(card_db: dict) -> None:
-    with open('data.json', 'w') as fp:
+    with open(EXPORT_PATH, 'w') as fp:
         json.dump(card_db, fp, indent=4)
     _log.info("Exported metadata to: %s", EXPORT_PATH)
 
