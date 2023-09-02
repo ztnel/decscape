@@ -3,30 +3,26 @@ import json
 import logging
 from decscape.constants import SIDEBOARD_PREFIX, LINE_REGEX, EXPORT_PATH
 
-_log = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def export(card_db: dict) -> None:
     with open(EXPORT_PATH, 'w') as fp:
         json.dump(card_db, fp, indent=4)
-    _log.info("Exported metadata to: %s", EXPORT_PATH)
+    _logger.info("Exported metadata to: %s", EXPORT_PATH)
 
 
 def update(dec: str, card_db: dict) -> dict:
     for line in dec.split('\n'):
         main = False
-        _log.debug("Line: %s", line)
+        _logger.debug("Line: %s", line)
         if not line:
-            _log.debug("Class: dc")
             continue
         if line[0].isdigit():
             main = True
-            _log.debug("Class: main")
         elif line.find(SIDEBOARD_PREFIX) != -1:
             line = line.lstrip(SIDEBOARD_PREFIX)
-            _log.debug("Class: side")
         else:
-            _log.debug("Class: dc")
             continue
         match = re.match(LINE_REGEX, line)
         if match:

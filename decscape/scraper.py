@@ -1,8 +1,10 @@
 import re
+import logging
 import requests
 from bs4 import BeautifulSoup
 from decscape.constants import BASE_PATH, DECK_LINK_REGEX
 
+_logger = logging.getLogger(__name__)
 
 def pull_soup(url: str) -> BeautifulSoup:
     r = requests.get(url)
@@ -26,10 +28,12 @@ def pull_all(url: str) -> str:
             match = re.match(DECK_LINK_REGEX, href)
             if match:
                 deck_links.append(f'{BASE_PATH}/{href}')
+    _logger.debug("Found decklist urls: %s", deck_links)
+    _logger.info("Aggregating %s decklists", len(deck_links))
     buffer = ""
     for dl in deck_links:
         buffer += pull_dec_file(dl)
-    return buffer
+    return buffer 
 
 
 def pull_dec_file(url: str) -> str:

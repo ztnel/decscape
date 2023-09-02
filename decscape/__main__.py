@@ -1,10 +1,21 @@
-import plotly.graph_objects as go
-import logging
-from pprint import pformat
-from decscape.constants import *
-from decscape.scraper import pull_all, pull_dec_file
-from decscape.compiler import update, export
+# -*- coding: utf-8 -*-
 import json
+import logging
+import plotly.graph_objects as go
+from decscape.__version__ import __version__
+from decscape.utils.logging import configure_logging
+from decscape.constants import *
+from decscape.scraper import pull_all
+from decscape.compiler import update, export
+
+_logger = logging.getLogger(__name__)
+configure_logging()
+_logger.info("DecScape")
+_logger.info("=========================")
+_logger.info("Version: %s", __version__)
+
+PAGE = 'https://www.mtgtop8.com/archetype?f=PI&meta=194&a=880'
+
 """
 Deck Table
 {
@@ -26,11 +37,10 @@ Card Table
     'trend': counts / decks * 4
 }
 """
-logging.basicConfig()
-_log = logging.getLogger(__name__)
+
 card_db: dict[str, dict[str, int]] = {}
-buf = pull_all('https://www.mtgtop8.com/archetype?a=1543&meta=194&f=PI')
-# dec = pull_dec_file('https://www.mtgtop8.com/event?e=46783&d=545876&f=PI')
+_logger.info("Pulling decklists from: %s", PAGE)
+buf = pull_all(PAGE)
 # formatting reference
 """
 // FORMAT : Pioneer
@@ -55,6 +65,6 @@ fig.add_trace(go.Bar(y=names, x=main_counts, orientation='h', name='main', marke
 # Create a horizontal bar chart for 'side' counts
 fig.add_trace(go.Bar(y=names, x=side_counts, orientation='h', name='side', marker_color='red'))
 
-fig.update_layout(title_text="Rakdos Sacrifice Card Distribution [13/08 - 15/08]", yaxis_title="Card",
+fig.update_layout(title_text="", yaxis_title="Card",
                   xaxis_title="Total Counts", barmode='group')
 fig.show()

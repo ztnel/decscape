@@ -1,0 +1,34 @@
+---
+version: 1
+disable_existing_loggers: false
+loggers:
+  "":
+    level: DEBUG
+    handlers: ["console_handler"]
+    propagate: false
+  urllib3.connectionpool:
+    level: WARNING
+    handlers: ["console_handler"]
+    propagate: false
+
+handlers:
+  console_handler:
+    class: logging.StreamHandler
+    formatter: console
+
+formatters:
+  default:
+    format: "%(created)s %(threadName)s %(name)s:%(lineno)d - %(levelname)s: %(message)s"
+  console:
+    (): coloredlogs.ColoredFormatter
+    format: "%(created)s %(threadName)s %(name)s:%(lineno)d - %(levelname)s: %(message)s"
+    field_styles:
+      created:
+        color: green
+      threadName:
+        color: magenta
+      levelname:
+        bold: True
+        color: black
+      name:
+        color: blue
