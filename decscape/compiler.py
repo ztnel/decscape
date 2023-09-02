@@ -15,7 +15,6 @@ def export(card_db: dict) -> None:
 def update(dec: str, card_db: dict) -> dict:
     for line in dec.split('\n'):
         main = False
-        _logger.debug("Line: %s", line)
         if not line:
             continue
         if line[0].isdigit():

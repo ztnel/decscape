@@ -7,7 +7,7 @@ loggers:
     handlers: ["console_handler"]
     propagate: false
   urllib3.connectionpool:
-    level: WARNING
+    level: INFO
     handlers: ["console_handler"]
     propagate: false
 
