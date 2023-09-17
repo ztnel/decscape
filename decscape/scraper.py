@@ -2,7 +2,7 @@ import re
 import logging
 import requests
 from bs4 import BeautifulSoup
-from decscape.constants import BASE_PATH, DECK_LINK_REGEX
+from decscape.constants import BASE_PATH, DECK_LINK_REGEX, TS_TD_CLASS
 
 _logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def pull_soup(url: str) -> BeautifulSoup:
     return soup
 
 
-def pull_all(url: str) -> str:
+def pull_all(url: str, name=None, stars=None) -> tuple[str, int]:
     soup = pull_soup(url)
     form = soup.find('form')
     if not form:
@@ -23,17 +23,25 @@ def pull_all(url: str) -> str:
     deck_links = []
     for tr in form.find_all('tr', class_='hover_tr'):
         arefs = tr.find_all('a')
+        tds = tr.find_all('td', class_=TS_TD_CLASS)
         for aref in arefs:
             href = aref.get('href')
             match = re.match(DECK_LINK_REGEX, href)
             if match:
-                deck_links.append(f'{BASE_PATH}/{href}')
+                # now perform filter by deck name if available
+                if not name and not stars:
+                    deck_links.append(f'{BASE_PATH}/{href}')
+                elif name == aref.text:
+                    deck_links.append(f'{BASE_PATH}/{href}')
+                elif name == aref.text:
+                    deck_links.append(f'{BASE_PATH}/{href}')
+    count = len(deck_links)
     _logger.debug("Found decklist urls: %s", deck_links)
-    _logger.info("Aggregating %s decklists", len(deck_links))
+    _logger.info("Aggregating %s decklists", count)
     buffer = ""
     for dl in deck_links:
         buffer += pull_dec_file(dl)
-    return buffer 
+    return buffer, count
 
 
 def pull_dec_file(url: str) -> str:
