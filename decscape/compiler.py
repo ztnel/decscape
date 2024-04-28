@@ -12,7 +12,10 @@ def export(card_db: dict) -> None:
     _logger.info("Exported metadata to: %s", EXPORT_PATH)
 
 
-def update(dec: str, card_db: dict) -> dict:
+def update(dec: str, card_db: dict, sample_size:int, refs: list[str]) -> dict:
+    card_db["sample_size"] = sample_size
+    card_db["refs"] = refs
+    card_data = card_db["card_data"] = []
     for line in dec.split('\n'):
         main = False
         if not line:
@@ -29,11 +32,14 @@ def update(dec: str, card_db: dict) -> dict:
             name = str(match.group(2)).rstrip()  # returns "Rona's Vortex"
         else:
             raise ValueError("Regex parse failed on classified input")
-        meta = card_db.get(name)
-        if meta is None:
-            card_db[name] = {'side': 0, 'main': 0}
-        if main:
-            card_db[name]['main'] += quantity
+        # check existance
+        if len(list(filter(lambda x: x["name"] == name, card_data))) == 0:
+            card_data.append({"name": name, "main_counts": quantity if main else 0, "side_counts": quantity if not main else 0})
         else:
-            card_db[name]['side'] += quantity
+            for card in card_data:
+                if card["name"] == name:
+                    if main:
+                        card["main_counts"] += quantity
+                    else:
+                        card["side_counts"] += quantity
     return card_db

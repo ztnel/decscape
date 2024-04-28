@@ -1,9 +1,7 @@
-import os
 import yaml
 import logging
 import logging.config
 from pathlib import Path
-
 
 def configure_logging():
     conf_path = str(Path(__file__).parent.joinpath('logging.yaml').resolve())
@@ -17,6 +15,6 @@ def configure_logging():
         logging.exception("Failed to open logging config file due to yaml parse error")
     except FileNotFoundError:
         logging.exception(
-            "Logging config file not found in expected absolute path: {}".format(config_path))
+            "Logging config file not found in expected absolute path: {}".format(conf_path))
     else:
         logging.info("Logging configuration successful.")
