@@ -56,18 +56,31 @@ def pull_all(url: str, name:str|None=None, tclass:TournamentClass|None=None) -> 
     _logger.debug("Found decklist urls: %s", deck_links)
     _logger.info("Aggregating %s decklists", count)
     buffer = ""
-    for dl in deck_links:
-        buffer += pull_dec_file(dl)
+    session = requests.Session()
+    txt = []
+    with session as s:
+        for url in deck_links:
+            if '&d=' not in url:
+                continue
+            r = s.get(url)
+            txt.append(r.text)
+    arefs = []
+    for html in txt:
+        arefs.append(pull_dec_file(html))
+    # .dec file
+    with session as s:
+        for aref in arefs:
+            r = s.get(f'{BASE_PATH}/{aref}')
+            buffer += r.text
     return buffer, count, deck_links
 
-
-def pull_dec_file(url: str) -> str:
+def pull_dec_file(html: str) -> str:
     """
     Pulls the .dec data from a deck page and returns the text buffer.
     """
-    if '&d=' not in url:
-        raise ValueError("invalid deck page")
-    soup = pull_soup(url)
+    soup = BeautifulSoup(html, "html.parser")
+    if soup.body is None:
+        raise ValueError("No soup body found!")
     aref = None
     link = soup.find(string='.dec')
     if link is None:
@@ -77,7 +90,5 @@ def pull_dec_file(url: str) -> str:
         raise ValueError("No .dec link found")
     if 'd=' not in aref:
         raise ValueError("Invalid deck link")
-    # .dec file
-    r = requests.get(f'{BASE_PATH}/{aref}')
-    return r.text
+    return aref
 

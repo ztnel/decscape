@@ -18,7 +18,7 @@ handlers:
 
 formatters:
   default:
-    format: "%(created)s %(threadName)s %(name)s:%(lineno)d - %(levelname)s: %(message)s"
+    format: "%(created)s %(name)s:%(lineno)d - %(levelname)s: %(message)s"
   console:
     (): coloredlogs.ColoredFormatter
     format: "%(created)s %(threadName)s %(name)s:%(lineno)d - %(levelname)s: %(message)s"
