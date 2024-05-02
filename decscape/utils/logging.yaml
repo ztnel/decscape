@@ -3,7 +3,7 @@ version: 1
 disable_existing_loggers: false
 loggers:
   "":
-    level: DEBUG
+    level: INFO
     handlers: ["console_handler"]
     propagate: false
   urllib3.connectionpool:
