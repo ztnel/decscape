@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import os
+import sys
+from pprint import pprint
 import json
 import logging
 import argparse
@@ -7,14 +8,15 @@ import argparse
 from decscape.__version__ import __version__
 from decscape.utils.logging import configure_logging
 from decscape.constants import *
-from decscape.scraper import pull_all
+from decscape.scraper import pull_all, get_metagame
 from decscape.compiler import update, export
 from decscape.graph import plot, show
+from decscape.types import Format
 
-gpage = os.environ.get('PAGE', 'https://www.mtgtop8.com/archetype?a=808&meta=52&f=ST')
 parser = argparse.ArgumentParser( prog='decscape', description='mtgtop8 web scraper', epilog='Text at the bottom of help')
-parser.add_argument('-p', '--page')
-parser.add_argument('-t', '--tclass', choices=['professional', 'major', 'competitive', 'open'])
+parser.add_argument('-f', '--format', choices=list(Format), type=Format)
+parser.add_argument('-a', '--archetype', type=str, default="")
+parser.add_argument('-t', '--tclass', choices=['professional', 'major', 'competitive', 'open'], type=str, default="")
 args = parser.parse_args()
 
 _logger = logging.getLogger(__name__)
@@ -22,6 +24,12 @@ configure_logging()
 _logger.info("DecScape")
 _logger.info("========")
 _logger.info("Version: %s", __version__)
+
+metagame = get_metagame(args.format)
+archetype_uri = next(filter(lambda x: True if args.archetype == "" else x.archetype_name == args.archetype, metagame.archetypes)).archetype_uri
+if archetype_uri is None:
+    _logger.error("No archetype named: %s found. Referenced: %s", args.archetype, pprint(metagame.archetypes))
+    sys.exit(1)
 
 """
 Deck Table
@@ -46,8 +54,8 @@ Card Table
 """
 
 card_db: dict[str, dict[str, int]] = {}
-_logger.info("Pulling decklists from: %s", gpage)
-buf, deck_count, refs = pull_all(gpage, name="Temur Control")
+_logger.info("Pulling decklists from: %s", archetype_uri)
+buf, deck_count, refs = pull_all(archetype_uri)
 # formatting reference
 """
 // FORMAT : Pioneer
@@ -80,7 +88,7 @@ _logger.debug("Normalized names: %s", normalized_names)
 _logger.debug("Normalized side_counts: %s", normalized_side_counts)
 _logger.debug("Normalized main_counts: %s", normalized_main_counts)
 
-title_template = f'Cards in {deck_count} decks sampled from {gpage}' 
+title_template = f'Cards in {deck_count} decks sampled from {archetype_uri}' 
 plot(names, main_counts, "Aggregate Mainboard " + title_template, 'Mainboard Counts', 'Card Name')
 plot(names, side_counts,  "Aggregate Sideboard " + title_template, 'Sideboard Counts', 'Card Name')
 plot(normalized_names, normalized_main_counts,'Normalized Mainboard ' + title_template, 'Mainboard Counts', 'Card Name')
