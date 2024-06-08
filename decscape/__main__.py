@@ -5,6 +5,7 @@ import json
 import logging
 import argparse
 
+from dataclasses import asdict
 from decscape.__version__ import __version__
 from decscape.utils.logging import configure_logging
 from decscape.constants import *
@@ -13,9 +14,10 @@ from decscape.compiler import update, export
 from decscape.graph import plot, show
 from decscape.types import Format
 
-parser = argparse.ArgumentParser( prog='decscape', description='mtgtop8 web scraper', epilog='Text at the bottom of help')
-parser.add_argument('-f', '--format', choices=list(Format), type=Format)
+parser = argparse.ArgumentParser(prog='decscape', description='mtgtop8 web scraper', epilog='Text at the bottom of help')
+parser.add_argument('-f', '--format', required=True, choices=list(Format), type=Format)
 parser.add_argument('-a', '--archetype', type=str, default="")
+parser.add_argument('-ga', '--get-archetypes', dest="ga", required=False, action='store_true')
 parser.add_argument('-t', '--tclass', choices=['professional', 'major', 'competitive', 'open'], type=str, default="")
 args = parser.parse_args()
 
@@ -26,7 +28,12 @@ _logger.info("========")
 _logger.info("Version: %s", __version__)
 
 metagame = get_metagame(args.format)
+if args.ga:
+    print(json.dumps([asdict(arch) for arch in metagame.archetypes], indent=4))
+    sys.exit(1)
 archetype_uri = next(filter(lambda x: True if args.archetype == "" else x.archetype_name == args.archetype, metagame.archetypes)).archetype_uri
+if args.archetype == "":
+    _logger.warning("Archetype not specified, extracting random archetype uri: %s", archetype_uri)
 if archetype_uri is None:
     _logger.error("No archetype named: %s found. Referenced: %s", args.archetype, pprint(metagame.archetypes))
     sys.exit(1)

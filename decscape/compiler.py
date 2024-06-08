@@ -12,7 +12,7 @@ def export(card_db: dict) -> None:
     _logger.info("Exported metadata to: %s", EXPORT_PATH)
 
 
-def update(dec: str, card_db: dict, sample_size:int, refs: list[str]) -> dict:
+def update(dec: str, card_db: dict, sample_size: int, refs: list[str]) -> dict:
     card_db["sample_size"] = sample_size
     card_db["refs"] = refs
     card_data = card_db["card_data"] = []
@@ -34,7 +34,8 @@ def update(dec: str, card_db: dict, sample_size:int, refs: list[str]) -> dict:
             raise ValueError("Regex parse failed on classified input")
         # check existance
         if len(list(filter(lambda x: x["name"] == name, card_data))) == 0:
-            card_data.append({"name": name, "main_counts": quantity if main else 0, "side_counts": quantity if not main else 0})
+            card_data.append({"name": name, "main_counts": quantity if main else 0,
+                             "side_counts": quantity if not main else 0})
         else:
             for card in card_data:
                 if card["name"] == name:

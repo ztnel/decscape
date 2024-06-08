@@ -1,5 +1,4 @@
 import re
-import json
 import logging
 import requests
 
@@ -10,6 +9,7 @@ from decscape.constants import BASE_PATH
 
 _logger = logging.getLogger(__name__)
 
+
 def pull_soup(url: str) -> BeautifulSoup:
     r = requests.get(url)
     html = r.text
@@ -17,6 +17,7 @@ def pull_soup(url: str) -> BeautifulSoup:
     if soup.body is None:
         raise ValueError("No soup body found!")
     return soup
+
 
 def get_tournament_class(tds) -> TournamentClass:
     imgs = tds.find_all('img')
@@ -32,6 +33,7 @@ def get_tournament_class(tds) -> TournamentClass:
         tclass = TournamentClass.MAJOR
     return tclass
 
+
 def get_metagame(format: Format) -> Metagame:
     """
     Scrape a metagame breakdown for a particular format
@@ -44,16 +46,20 @@ def get_metagame(format: Format) -> Metagame:
         raise
     deck_sample_pattern = re.compile(r'^(\d.*) decks$')
     arch_percent_pattern = re.compile(r'^(\d.*) %$')
-    samples = [int(deck_sample_pattern.match(s14_div.string).group(1)) for s14_div in s14_divs if s14_div.string is not None and re.match(deck_sample_pattern, s14_div.string)][-1] # type: ignore
+    samples = [int(deck_sample_pattern.match(s14_div.string).group(1))
+               for s14_div in s14_divs if s14_div.string is not None and re.match(deck_sample_pattern, s14_div.string)][-1]  # type: ignore
     archetypes = []
     for arch_div in soup.find_all('div', class_="hover_tr", style="display:inline-block;width:48%;"):
         archetype_uri = arch_div.find('a').get('href')
         archetype_name = arch_div.find('a').string
-        meta_share = [float(arch_percent_pattern.match(arch_subdiv.string).group(1)) for arch_subdiv in arch_div.find_all('div') if arch_subdiv.string is not None and re.match(arch_percent_pattern, arch_subdiv.string)][-1] # type: ignore
-        archetypes.append(Archetype(archetype_name, f"{BASE_PATH}/{archetype_uri}", meta_share))
+        meta_share = [float(arch_percent_pattern.match(arch_subdiv.string).group(1)) for arch_subdiv in arch_div.find_all(
+            'div') if arch_subdiv.string is not None and re.match(arch_percent_pattern, arch_subdiv.string)][-1]  # type: ignore
+        archetypes.append(
+            Archetype(archetype_name, f"{BASE_PATH}/{archetype_uri}", meta_share))
     return Metagame(format, samples, archetypes)
 
-def pull_all(url: str, tclass:TournamentClass|None=None) -> tuple[str, int, list[str]]:
+
+def pull_all(url: str, tclass: TournamentClass | None = None) -> tuple[str, int, list[str]]:
     entries = []
     soup = pull_soup(url)
     form = soup.find('form')
@@ -95,6 +101,7 @@ def pull_all(url: str, tclass:TournamentClass|None=None) -> tuple[str, int, list
             buffer += r.text
     return buffer, count, deck_links
 
+
 def get_dec_url(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
     if soup.body is None:
@@ -111,4 +118,3 @@ def get_dec_url(html: str) -> str:
     if not isinstance(aref, str):
         raise TypeError("Expected aref to be str")
     return aref
-
