@@ -1,82 +1,149 @@
 
 #include <math.h>
+#include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <time.h>
 
 #include "monte_carlo.h"
 #include "stats.h"
 
-#define TURNS (uint8_t)4
-#define SAMPLES (uint8_t)7 + (TURNS - 1)
 #define P_MAX (float)1.0f
+#define FP_TOLERANCE 1e-6f // rounding errors
 
-#define STATUS_S1 (1 << 0)
-#define STATUS_S2 (1 << 1)
-
-static float generate_seed() {
-  return (float)rand() / RAND_MAX;
+static float generate_seed(void) {
+  float r = 0.0f; 
+  while (r == 0.0f) {
+    r = (float)rand() / (float)RAND_MAX;
+  }
+  return r;
 }
 
-static void update_stats() {
-
-}
-
-static void simulate(uint8_t *status, const uint8_t successes, uint8_t sample_size) {
-  float success_ratio = (float)successes / sample_size;
-  uint8_t hits = 0;
-  for (uint8_t j = 0; j < SAMPLES; j++) {
-    float seed = generate_seed();
-    if (seed <= success_ratio) {
-      hits++;
-    }
-    if (j == 6) {
-      if (hits > 0) {
-        *status |= STATUS_S1;
-      }
-    } else if (j == (SAMPLES - 1)) {
-      if (hits <= 4) {
-        *status |= STATUS_S2;
-      }
-    }
-#ifdef DEBUG
-    printf("%i: hits: %u seed: %.2f, status: %u, success_ratio: (%u/%u) %.2f\n", j, hits, seed, *status, successes, sample_size, success_ratio);
-#endif
-    sample_size--;
-    success_ratio = (float)(successes - hits) / sample_size;
+static void state_estimator(float *psv, const uint16_t *cv, const size_t num_subsets) {
+  uint64_t population_size = 0;
+  for (size_t i = 0; i < num_subsets; i++) {
+    population_size += cv[i];
+  }
+  for (size_t i = 0; i < num_subsets; i++) {
+    psv[i] = (float)cv[i] / population_size;
   }
 }
 
-void mc_init(void) {
-  srand(time(NULL));
-}
-
-float mc_run(uint8_t successes, const uint8_t sample_size, const uint32_t epochs) {
-  float p_success_1 = 0.0f;
-  float p_success_2 = 0.0f;
-  float p_s1_s2 = 0.0f;
-  uint16_t acc_success_1 = 0;
-  uint16_t acc_success_2 = 0;
-  printf("EPOCH,ACC(S1),ACC(S2),P(S1),P(S2)\n");
-  float result_vector[MC_MAX_EPOCHS][MC_MAX_EVENTS] = {0.0f};
-  for (uint32_t i = 1; i < epochs; i++) {
-    uint8_t status = 0;
-    simulate(&status, successes, sample_size);
-    if (status & STATUS_S1) {
-      acc_success_1++;
-    }
-    if (status & STATUS_S2) {
-      acc_success_2++;
-    }
-    p_success_1 = fminf((float)acc_success_1 / i, P_MAX);
-    p_success_2 = fminf((float)acc_success_2 / i, P_MAX);
-    p_s1_s2 = p_success_1 * p_success_2;
-    if (stats_rse(mean, fstd) < target_margin) {
+static void randomizer(uint16_t *cv, uint16_t *csv, const float *psv, const size_t num_subsets) {
+  const float seed = generate_seed();
+  float cumulative_probability = 0.0f;
+  for (size_t i = 0; i < num_subsets; i++) {
+    cumulative_probability += psv[i] + FP_TOLERANCE; 
+    if (seed < cumulative_probability) {
+      cv[i]--;
+      csv[i]++;
       break;
     }
-    // export results
-    printf("%u,%u,%u,%.2f,%.2f,%.2f\n", i, acc_success_1, acc_success_2, p_success_1, p_success_2, p_s1_s2);
+  }
+}
+
+/**
+ * @brief Find the maximum iterations required based on channel iteration triggers
+ * 
+ * @return Maximum number of iterations
+ */
+static uint8_t get_max_iterations(const struct mc_event_channel *channels, size_t num_channels) {
+  uint8_t max_iterations = 0;
+  for (size_t i = 0; i < num_channels; i++) {
+    if (channels[i].iteration_trigger > max_iterations) {
+      max_iterations = channels[i].iteration_trigger;
+    }
+  }
+  return max_iterations;
+}
+
+static void run_traces(bool *iev, const uint16_t *csv, const struct mc_params *params, const uint8_t iteration) {
+  for (size_t i = 0; i < params->num_channels; i++) {
+    const struct mc_event_channel *channel = &params->channels[i];
+    if (channel->iteration_trigger == iteration) {
+      // iev can only be updated once per simulation epoch
+      iev[i] = channel->event_test_cb(csv, iev);
+    }
+  }
+}
+static void update_stats(float *result_vector, const uint16_t *csv, const size_t num_channels, const uint64_t epoch) {
+  for (size_t i = 0; i < num_channels; i++) {
+    result_vector[i] = fminf((float)csv[i] / (float)epoch, P_MAX);
+  }
+}
+
+static void print_csv_header(const size_t num_channels) {
+  printf("EPOCH,");
+  for (size_t i = 0; i < num_channels; i++) {
+    printf("ACC(E%zu),", i);
+  }
+  for (size_t i = 0; i < num_channels; i++) {
+    printf("P(E%zu),", i);
   }
   printf("\n");
-  return p_s1_s2;
 }
+
+static void report(const uint64_t epoch, const uint16_t *csv, const float *psv, const size_t num_channels) {
+  printf("%llu,", epoch);
+  for (size_t i = 0; i < num_channels; i++) {
+    printf("%u,", csv[i]);
+  }
+  for (size_t i = 0; i < num_channels; i++) {
+    printf("%.4f,", psv[i]);
+  }
+  printf("\n");
+}
+
+static void simulate(uint16_t *cesv, const struct mc_params *params, const uint8_t max_iterations) {
+  bool iev[MC_MAX_EVENT_CHANNELS] = {0};
+  float psv[MC_MAX_SUBSETS] = {0.0f};
+  uint16_t cv[MC_MAX_SUBSETS] = {0};
+  uint16_t csv[MC_MAX_SUBSETS] = {0};
+  memcpy(cv, params->cardinality_vector, sizeof(params->cardinality_vector[0]) * params->num_subsets);
+  for (uint8_t iteration = 1; iteration <= max_iterations; iteration++) {
+    // update psv
+    state_estimator(psv, cv, params->num_subsets);
+    // update cv and csv
+    randomizer(cv, csv, psv, params->num_subsets);
+    run_traces(iev, csv, params, iteration);
+#ifdef DEBUG
+    printf("%u,", iteration);
+    for (size_t i = 0; i < params->num_subsets; i++) {
+      printf("%u,", cv[i]);
+    }
+    for (size_t i = 0; i < params->num_subsets; i++) {
+      printf("%u,", csv[i]);
+    }
+    for (size_t i = 0; i < params->num_subsets; i++) {
+      printf("%.2f,", psv[i]);
+    }
+    for (size_t i = 0; i < params->num_channels; i++) {
+      printf("%u,", (uint8_t)iev[i]);
+    }
+    printf("\n");
+#endif
+  }
+  // accumulate csv successes
+  for (size_t i = 0; i < params->num_channels; i++) {
+    if (iev[i]) {
+      cesv[i]++;
+    }
+  }
+}
+
+void mc_run_simulation(float *result_vector, const struct mc_params *params) {
+  uint16_t csv[MC_MAX_EVENT_CHANNELS] = {0};
+  // calculate maximum iterations from channel iteration triggers
+  const uint8_t max_iterations = get_max_iterations(params->channels, params->num_channels);
+  // initialize seed for randomizer
+  srand(time(NULL));
+  print_csv_header(params->num_channels);
+  for (uint64_t epoch = 1; epoch < params->max_epochs; epoch++) {
+    simulate(csv, params, max_iterations);
+    update_stats(result_vector, csv, params->num_channels, epoch);
+    report(epoch, csv, result_vector, params->num_channels);
+  }
+}
+
