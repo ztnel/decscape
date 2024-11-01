@@ -2,19 +2,26 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#define MC_MAX_EVENT_CHANNELS 20
+#define MC_MAX_TEMPORAL_NODES 20
+#define MC_MAX_COMPOSITION_NODES MC_MAX_TEMPORAL_NODES
 #define MC_MAX_EPOCHS 5000
 #define MC_MAX_SUBSETS 10
 
-typedef bool (*event_test_cb_t)(const uint16_t *csv, const bool *iev);
+typedef bool (*temporal_activation_func)(const uint16_t *samples);
+typedef bool (*composition_activation_func)(const bool *event_vector);
 
-struct mc_event_channel {
+struct temporal_node {
   uint8_t iteration_trigger;
-  event_test_cb_t event_test_cb;
+  temporal_activation_func activation;
+};
+
+struct composition_node {
+  struct temporal_node inputs[MC_MAX_TEMPORAL_NODES];
+  composition_activation_func activation;
 };
 
 struct mc_params {
@@ -22,8 +29,10 @@ struct mc_params {
   float target_margin;
   uint16_t cardinality_vector[MC_MAX_SUBSETS];
   size_t num_subsets;
-  struct mc_event_channel channels[MC_MAX_EVENT_CHANNELS];
-  size_t num_channels;
+  struct temporal_node temporal_nodes[MC_MAX_TEMPORAL_NODES];
+  size_t num_temporal_nodes;
+  struct composition_node composition_nodes[MC_MAX_COMPOSITION_NODES];
+  size_t num_composition_nodes;
 };
 
 void mc_run_simulation(float *result_vector, const struct mc_params *params);
